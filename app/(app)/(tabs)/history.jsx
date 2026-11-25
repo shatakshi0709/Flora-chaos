@@ -1,11 +1,14 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import Screen from '../../../src/components/layout/Screen';
 import Card from '../../../src/components/ui/Card';
 import Input from '../../../src/components/ui/Input';
 import Chip from '../../../src/components/ui/Chip';
 import ScanCard from '../../../src/components/scan/ScanCard';
 import EmptyState from '../../../src/components/ui/EmptyState';
+import LoadingState from '../../../src/components/ui/LoadingState';
 import { useScanLibrary } from '../../../src/hooks/useScanLibrary';
+import { useUserScans } from '../../../src/hooks/useUserScans';
 import { colors, radius, spacing, typography } from '../../../src/theme';
 
 const filters = [
@@ -15,7 +18,16 @@ const filters = [
 ];
 
 export default function HistoryScreen() {
-  const { scans, query, setQuery, filter, setFilter, isEmpty } = useScanLibrary();
+  const router = useRouter();
+  const {
+    scans: allScans,
+    loading,
+    error,
+    isPreview,
+    refresh,
+  } = useUserScans();
+  const { scans, query, setQuery, filter, setFilter, isEmpty } =
+    useScanLibrary(allScans);
 
   function reset() {
     setQuery('');
@@ -27,7 +39,11 @@ export default function HistoryScreen() {
       <View style={styles.heading}>
         <Text style={styles.eyebrow}>YOUR LIBRARY</Text>
         <Text style={styles.title}>Scan history</Text>
-        <Text style={styles.subtitle}>Browse your recent preview analyses.</Text>
+        <Text style={styles.subtitle}>
+          {isPreview
+            ? 'Browse your recent preview analyses.'
+            : 'Browse the scans saved to your account.'}
+        </Text>
       </View>
 
       <Card style={styles.searchCard}>
@@ -61,16 +77,34 @@ export default function HistoryScreen() {
 
       <View style={styles.listHeader}>
         <Text style={styles.count}>{scans.length} result{scans.length === 1 ? '' : 's'}</Text>
-        <Chip label="SAMPLE DATA" tone="neutral" icon="information-circle-outline" />
+        <Chip
+          label={isPreview ? 'SAMPLE DATA' : 'YOUR SCANS'}
+          tone="neutral"
+          icon="information-circle-outline"
+        />
       </View>
 
-      {isEmpty ? (
+      {loading ? (
+        <LoadingState label="Loading your scans…" />
+      ) : error ? (
+        <EmptyState
+          icon="alert-circle-outline"
+          title="Could not load scans"
+          message={error}
+          actionLabel="Try again"
+          onAction={refresh}
+        />
+      ) : isEmpty ? (
         <EmptyState
           icon="search-outline"
           title="No matching scans"
-          message="Try a different crop name or clear the filters to see all preview scans."
-          actionLabel="Clear filters"
-          onAction={reset}
+          message={
+            allScans.length === 0
+              ? 'Capture a leaf to start your scan library.'
+              : 'Try a different crop name or clear the filters to see all scans.'
+          }
+          actionLabel={allScans.length === 0 ? 'Scan a leaf' : 'Clear filters'}
+          onAction={allScans.length === 0 ? () => router.push('/scan') : reset}
         />
       ) : (
         scans.map((scan) => <ScanCard key={scan.id} scan={scan} />)

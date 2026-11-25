@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -9,13 +10,45 @@ import Chip from '../../../src/components/ui/Chip';
 import SectionHeader from '../../../src/components/ui/SectionHeader';
 import LoadingState from '../../../src/components/ui/LoadingState';
 import ScanPreview from '../../../src/components/scan/ScanPreview';
+import { useAuth } from '../../../src/context/AuthContext';
 import { useImageCapture } from '../../../src/hooks/useImageCapture';
+import { useUserScans } from '../../../src/hooks/useUserScans';
+import { createScan } from '../../../src/services/scans';
+import { uploadLeafImage } from '../../../src/services/storage';
+import { createId } from '../../../src/lib/id';
 import { plantTips } from '../../../src/data/sample';
 import { colors, radius, spacing, typography } from '../../../src/theme';
 
 export default function ScanScreen() {
   const router = useRouter();
+  const { user, isConfigured } = useAuth();
+  const { refresh } = useUserScans();
   const { image, busy, error, pick, clear } = useImageCapture();
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const canSave = isConfigured && Boolean(user);
+
+  async function savePhoto() {
+    if (!image || !user || saving) return;
+
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const id = createId();
+      const imagePath = await uploadLeafImage({
+        userId: user.id,
+        imageUri: image.uri,
+        scanId: id,
+      });
+      const scan = await createScan({ id, imagePath, status: 'pending' });
+      await refresh();
+      router.push({ pathname: '/result/[id]', params: { id: scan.id } });
+    } catch (cause) {
+      setSaveError(cause?.message || 'The photo could not be saved. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <Screen>
@@ -39,7 +72,9 @@ export default function ScanScreen() {
           </View>
           <Text style={styles.captureTitle}>Choose an image source</Text>
           <Text style={styles.captureBody}>
-            Your photo stays on this device in this preview build.
+            {canSave
+              ? 'Your photo will be saved privately to your account. No analysis is run yet.'
+              : 'Your photo stays on this device in this preview build.'}
           </Text>
 
           {busy ? (
@@ -79,24 +114,50 @@ export default function ScanScreen() {
       {image ? (
         <Card style={styles.resultCard}>
           <SectionHeader
-            title="Image ready"
-            subtitle="No analysis has been run yet"
+            title={canSave ? 'Photo ready' : 'Image ready'}
+            subtitle={
+              canSave
+                ? 'Save it to your private scan library'
+                : 'No analysis has been run yet'
+            }
           />
           <ScanPreview uri={image.uri} />
           <View style={styles.spacer} />
-          <Chip label="PREVIEW ONLY" tone="amber" icon="information-circle-outline" />
+          <Chip
+            label={canSave ? 'PENDING ANALYSIS' : 'PREVIEW ONLY'}
+            tone="amber"
+            icon="information-circle-outline"
+          />
           <Text style={styles.resultBody}>
-            AI inference is not connected in this UI build. A real classification
-            service will return the disease, confidence and care guidance.
+            {canSave
+              ? 'Saving creates a pending scan. No disease label or confidence score is generated until an inference service is connected.'
+              : 'AI inference is not connected in this UI build. A real classification service will return the disease, confidence and care guidance.'}
           </Text>
+
+          {saveError ? (
+            <View style={styles.saveError}>
+              <Ionicons name="alert-circle-outline" size={17} color={colors.red} />
+              <Text style={styles.saveErrorText}>{saveError}</Text>
+            </View>
+          ) : null}
+
           <View style={styles.resultActions}>
-            <Button
-              label="View a sample result"
-              icon="document-text-outline"
-              onPress={() =>
-                router.push({ pathname: '/result/[id]', params: { id: 'scan-001' } })
-              }
-            />
+            {canSave ? (
+              <Button
+                label="Save to my scans"
+                icon="cloud-upload-outline"
+                onPress={savePhoto}
+                loading={saving}
+              />
+            ) : (
+              <Button
+                label="View a sample result"
+                icon="document-text-outline"
+                onPress={() =>
+                  router.push({ pathname: '/result/[id]', params: { id: 'scan-001' } })
+                }
+              />
+            )}
             <Button label="Clear image" variant="secondary" onPress={clear} />
           </View>
         </Card>
@@ -165,6 +226,13 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     lineHeight: 20,
   },
+  saveError: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: spacing.md,
+  },
+  saveErrorText: { ...typography.bodySmall, color: colors.red, flex: 1, lineHeight: 18 },
   resultActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.xl },
   section: { marginBottom: spacing.xl },
   tipCard: { marginBottom: spacing.md },

@@ -3,11 +3,13 @@ import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import LeafMark from '../src/components/ui/LeafMark';
+import { useAuth } from '../src/context/AuthContext';
 import { colors, spacing, typography } from '../src/theme';
 
 /** Branded in-app splash. It is an intro animation, not a fake loading task. */
 export default function SplashScreen() {
   const router = useRouter();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const opacity = useMemo(() => new Animated.Value(0), []);
   const scale = useMemo(() => new Animated.Value(0.82), []);
 
@@ -26,13 +28,17 @@ export default function SplashScreen() {
       }),
     ]);
     animation.start();
+    return () => animation.stop();
+  }, [opacity, scale]);
 
-    const timer = setTimeout(() => router.replace('/welcome'), 1900);
-    return () => {
-      animation.stop();
-      clearTimeout(timer);
-    };
-  }, [opacity, scale, router]);
+  useEffect(() => {
+    if (authLoading) return undefined;
+    const timer = setTimeout(
+      () => router.replace(isAuthenticated ? '/home' : '/welcome'),
+      1900
+    );
+    return () => clearTimeout(timer);
+  }, [authLoading, isAuthenticated, router]);
 
   return (
     <LinearGradient

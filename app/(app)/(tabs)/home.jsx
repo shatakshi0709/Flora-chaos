@@ -11,12 +11,16 @@ import Chip from '../../../src/components/ui/Chip';
 import ScanCard from '../../../src/components/scan/ScanCard';
 import TipCard from '../../../src/components/home/TipCard';
 import QuickNavCard from '../../../src/components/home/QuickNavCard';
-import { sampleScans, plantTips } from '../../../src/data/sample';
+import LoadingState from '../../../src/components/ui/LoadingState';
+import EmptyState from '../../../src/components/ui/EmptyState';
+import { useUserScans } from '../../../src/hooks/useUserScans';
+import { plantTips } from '../../../src/data/sample';
 import { colors, spacing, typography } from '../../../src/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const recent = sampleScans.slice(0, 3);
+  const { scans, loading, isPreview } = useUserScans();
+  const recent = scans.slice(0, 3);
 
   return (
     <Screen>
@@ -54,13 +58,23 @@ export default function HomeScreen() {
       <View style={styles.section}>
         <SectionHeader
           title="Recent scans"
-          subtitle="Your latest preview analyses"
+          subtitle={isPreview ? 'Your latest preview analyses' : 'Your latest saved scans'}
           actionLabel="See all"
           onAction={() => router.push('/history')}
         />
-        {recent.map((scan) => (
-          <ScanCard key={scan.id} scan={scan} compact />
-        ))}
+        {loading ? (
+          <LoadingState label="Loading your scans…" />
+        ) : recent.length ? (
+          recent.map((scan) => <ScanCard key={scan.id} scan={scan} compact />)
+        ) : (
+          <EmptyState
+            icon="leaf-outline"
+            title="No scans yet"
+            message="Capture a leaf to start building your private scan library."
+            actionLabel="Scan a leaf"
+            onAction={() => router.push('/scan')}
+          />
+        )}
       </View>
 
       <View style={styles.section}>
@@ -106,7 +120,9 @@ export default function HomeScreen() {
       <View style={styles.footnote}>
         <Ionicons name="information-circle-outline" size={15} color={colors.muted} />
         <Text style={styles.footnoteText}>
-          UI preview — results shown are sample data, not diagnoses.
+          {isPreview
+            ? 'UI preview — results shown are sample data, not diagnoses.'
+            : 'Your scans are private. No AI analysis has run yet.'}
         </Text>
       </View>
     </Screen>

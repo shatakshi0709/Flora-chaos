@@ -8,23 +8,27 @@ import Card from '../../src/components/ui/Card';
 import Button from '../../src/components/ui/Button';
 import Input from '../../src/components/ui/Input';
 import LeafMark from '../../src/components/ui/LeafMark';
+import { useAuth } from '../../src/context/AuthContext';
+import { errorMessage } from '../../src/services/auth';
 import { colors, spacing, typography } from '../../src/theme';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function SignupScreen() {
   const router = useRouter();
+  const { signUp, isConfigured } = useAuth();
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
   const [errors, setErrors] = useState({});
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   function update(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
-    setNotice('');
+    setNotice(null);
   }
 
-  function submit() {
+  async function submit() {
     const next = {};
     if (!form.name.trim()) next.name = 'Tell us your name.';
     if (!form.email.trim()) next.email = 'Email is required.';
@@ -34,10 +38,37 @@ export default function SignupScreen() {
     if (form.confirm !== form.password) next.confirm = 'Passwords do not match.';
 
     setErrors(next);
-    if (Object.keys(next).length === 0) {
-      setNotice(
-        'This preview does not create an account yet. Supabase signup will be added in a later milestone.'
-      );
+    if (Object.keys(next).length > 0) return;
+
+    if (!isConfigured) {
+      setNotice({
+        tone: 'info',
+        text: 'Supabase is not configured. Add the public env values from .env.example to create an account.',
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    setNotice(null);
+    try {
+      const result = await signUp({
+        email: form.email,
+        password: form.password,
+        fullName: form.name,
+      });
+
+      if (result?.needsConfirmation) {
+        setNotice({
+          tone: 'info',
+          text: 'Account created. Check your inbox to confirm your email, then sign in.',
+        });
+      } else {
+        router.replace('/home');
+      }
+    } catch (error) {
+      setNotice({ tone: 'error', text: errorMessage(error) });
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -100,16 +131,33 @@ export default function SignupScreen() {
           returnKeyType="done"
         />
 
-        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+        {notice ? (
+          <Text
+            style={[
+              styles.notice,
+              notice.tone === 'error' && styles.noticeError,
+            ]}
+          >
+            {notice.text}
+          </Text>
+        ) : null}
 
-        <Button label="Create account" fullWidth onPress={submit} style={styles.submit} />
         <Button
-          label="Explore the UI preview"
-          variant="secondary"
+          label="Create account"
           fullWidth
-          onPress={() => router.replace('/home')}
-          style={styles.preview}
+          onPress={submit}
+          loading={submitting}
+          style={styles.submit}
         />
+        {!isConfigured ? (
+          <Button
+            label="Explore the UI preview"
+            variant="secondary"
+            fullWidth
+            onPress={() => router.replace('/home')}
+            style={styles.preview}
+          />
+        ) : null}
       </Card>
 
       <View style={styles.footer}>
@@ -150,6 +198,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     lineHeight: 19,
   },
+  noticeError: { color: '#9A4032', backgroundColor: '#FDE5E0' },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',

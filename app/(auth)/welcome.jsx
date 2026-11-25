@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import Screen from '../../src/components/layout/Screen';
 import Button from '../../src/components/ui/Button';
 import LeafMark from '../../src/components/ui/LeafMark';
+import { useAuth } from '../../src/context/AuthContext';
 import { colors, radius, spacing, typography } from '../../src/theme';
 
 const highlights = [
@@ -15,6 +16,7 @@ const highlights = [
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const { isConfigured } = useAuth();
 
   return (
     <Screen dark scroll={false}>
@@ -67,12 +69,14 @@ export default function WelcomeScreen() {
             fullWidth
             onPress={() => router.push('/login')}
           />
-          <Button
-            label="Explore the UI preview"
-            variant="ghostDark"
-            fullWidth
-            onPress={() => router.replace('/home')}
-          />
+          {!isConfigured ? (
+            <Button
+              label="Explore the UI preview"
+              variant="ghostDark"
+              fullWidth
+              onPress={() => router.replace('/home')}
+            />
+          ) : null}
         </View>
       </View>
     </Screen>

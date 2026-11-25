@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -7,22 +8,51 @@ import Card from '../../../src/components/ui/Card';
 import Button from '../../../src/components/ui/Button';
 import LeafMark from '../../../src/components/ui/LeafMark';
 import SectionHeader from '../../../src/components/ui/SectionHeader';
+import { useAuth } from '../../../src/context/AuthContext';
+import { useUserScans } from '../../../src/hooks/useUserScans';
 import { colors, radius, spacing, typography } from '../../../src/theme';
-
-const stats = [
-  { value: '12', label: 'Scans' },
-  { value: '3', label: 'Detections' },
-  { value: '92%', label: 'Avg. score' },
-];
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { user, profile, isConfigured, signOut } = useAuth();
+  const { scans, isPreview } = useUserScans();
+  const [signingOut, setSigningOut] = useState(false);
+
+  const displayName =
+    profile?.full_name || user?.email?.split('@')[0] || 'Preview gardener';
+  const displayEmail = user?.email || 'preview@florachaos.app';
+
+  const scored = scans.filter((scan) => scan.confidence > 0);
+  const average = scored.length
+    ? `${Math.round(
+        scored.reduce((total, scan) => total + scan.confidence, 0) / scored.length * 100
+      )}%`
+    : '—';
+  const stats = [
+    { value: String(scans.length), label: 'Scans' },
+    { value: String(scans.filter((scan) => scan.status === 'detected').length), label: 'Detections' },
+    { value: average, label: 'Avg. score' },
+  ];
 
   function showAbout() {
     Alert.alert(
       'Flora Chaos',
-      'This is a UI preview. Accounts, storage and AI detection will be connected to real services in later milestones.'
+      isConfigured
+        ? 'Accounts and scan storage are connected to Supabase. AI disease detection is not connected yet, so saved scans stay pending.'
+        : 'This is a UI preview. Accounts, storage and AI detection will be connected to real services in later milestones.'
     );
+  }
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await signOut();
+      router.replace('/welcome');
+    } catch (error) {
+      Alert.alert('Could not sign out', error?.message || 'Please try again.');
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   return (
@@ -40,8 +70,8 @@ export default function ProfileScreen() {
         <View style={styles.identityContent}>
           <LeafMark size={64} light />
           <View style={styles.identityCopy}>
-            <Text style={styles.name}>Preview gardener</Text>
-            <Text style={styles.email}>preview@florachaos.app</Text>
+            <Text style={styles.name}>{displayName}</Text>
+            <Text style={styles.email}>{displayEmail}</Text>
           </View>
         </View>
         <View style={styles.statsRow}>
@@ -66,7 +96,7 @@ export default function ProfileScreen() {
           <MenuRow
             icon="time-outline"
             label="Scan history"
-            hint="Review sample results"
+            hint={isPreview ? 'Review sample results' : 'Review your saved scans'}
             onPress={() => router.push('/history')}
           />
           <MenuRow
@@ -79,18 +109,34 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <SectionHeader title="Session" subtitle="Preview controls" />
-        <Button
-          label="Exit preview"
-          icon="exit-outline"
-          variant="secondary"
-          fullWidth
-          onPress={() => router.replace('/welcome')}
+        <SectionHeader
+          title="Session"
+          subtitle={isConfigured ? 'Your Supabase account' : 'Preview controls'}
         />
+        {isConfigured ? (
+          <Button
+            label="Sign out"
+            icon="log-out-outline"
+            variant="secondary"
+            fullWidth
+            loading={signingOut}
+            onPress={handleSignOut}
+          />
+        ) : (
+          <Button
+            label="Exit preview"
+            icon="exit-outline"
+            variant="secondary"
+            fullWidth
+            onPress={() => router.replace('/welcome')}
+          />
+        )}
       </View>
 
       <Text style={styles.footnote}>
-        No account is active. Sign-in and sign-up will use Supabase in a later milestone.
+        {isConfigured
+          ? 'Your scans are private to your account. No AI diagnosis has been generated.'
+          : 'No account is active. Sign-in and sign-up will use Supabase when configured.'}
       </Text>
     </Screen>
   );

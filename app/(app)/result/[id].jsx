@@ -8,29 +8,37 @@ import Button from '../../../src/components/ui/Button';
 import Chip from '../../../src/components/ui/Chip';
 import ConfidenceBar from '../../../src/components/ui/ConfidenceBar';
 import EmptyState from '../../../src/components/ui/EmptyState';
+import LoadingState from '../../../src/components/ui/LoadingState';
 import SectionHeader from '../../../src/components/ui/SectionHeader';
 import { BulletList, NumberedList } from '../../../src/components/result/InfoList';
-import {
-  formatDate,
-  getDiseaseForScan,
-  getScanById,
-} from '../../../src/data/sample';
+import { formatDate } from '../../../src/data/sample';
+import { useScanResult } from '../../../src/hooks/useScanResult';
 import { colors, radius, spacing, typography } from '../../../src/theme';
 
 export default function ResultScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
-  const scan = getScanById(id);
-  const disease = getDiseaseForScan(scan);
+  const { scan, disease, loading, error, isPreview } = useScanResult(id);
 
-  if (!scan || !disease) {
+  if (loading) {
+    return (
+      <Screen>
+        <LoadingState label="Loading scan…" />
+      </Screen>
+    );
+  }
+
+  if (!scan) {
     return (
       <Screen>
         <EmptyState
           icon="document-outline"
           title="Result not found"
-          message="This preview result is no longer available. Browse the sample history instead."
+          message={
+            error ||
+            'This scan is no longer available. Browse your scan history instead.'
+          }
           actionLabel="Back to history"
           onAction={() => router.replace('/history')}
         />
@@ -39,6 +47,7 @@ export default function ResultScreen() {
   }
 
   const tone = scan.status === 'healthy' ? 'lime' : scan.severity === 'High' ? 'red' : 'amber';
+  const isPending = !disease;
 
   return (
     <Screen>
@@ -59,45 +68,76 @@ export default function ResultScreen() {
         </Pressable>
 
         <View style={styles.heroContent}>
-          <Chip label="SAMPLE RESULT" tone="neutral" icon="information-circle-outline" />
+          <Chip
+            label={
+              isPreview ? 'SAMPLE RESULT' : isPending ? 'SCAN SAVED' : 'SAVED RESULT'
+            }
+            tone="neutral"
+            icon="information-circle-outline"
+          />
           <Text style={styles.crop}>{scan.crop}</Text>
           <Text style={styles.disease}>{scan.disease}</Text>
           <Text style={styles.date}>Scanned {formatDate(scan.date)}</Text>
 
-          <View style={styles.confidenceBox}>
-            <ConfidenceBar value={scan.confidence} label="Model confidence" light />
-            <Text style={styles.confidenceNote}>
-              Score shown from the sample record. Real results come from the inference model.
-            </Text>
-          </View>
+          {scan.confidence > 0 ? (
+            <View style={styles.confidenceBox}>
+              <ConfidenceBar value={scan.confidence} label="Model confidence" light />
+              <Text style={styles.confidenceNote}>
+                {isPreview
+                  ? 'Score shown from the sample record. Real results come from the inference model.'
+                  : 'Score shown from the saved record, supplied by the inference provider.'}
+              </Text>
+            </View>
+          ) : null}
 
           <View style={styles.heroChips}>
-            <Chip label={scan.severity} tone={tone} icon="pulse-outline" />
-            <Chip label={scan.status === 'healthy' ? 'No issue' : 'Possible issue'} tone="lime" />
+            {disease ? <Chip label={scan.severity} tone={tone} icon="pulse-outline" /> : null}
+            <Chip
+              label={isPending ? 'AWAITING ANALYSIS' : scan.status === 'healthy' ? 'No issue' : 'Possible issue'}
+              tone={isPending ? 'amber' : 'lime'}
+            />
           </View>
         </View>
       </Card>
 
-      <View style={styles.section}>
-        <SectionHeader title="What the sample shows" subtitle={disease.cause} />
-        <Card>
-          <Text style={styles.summary}>{disease.summary}</Text>
-        </Card>
-      </View>
+      {disease ? (
+        <>
+          <View style={styles.section}>
+            <SectionHeader title="What the sample shows" subtitle={disease.cause} />
+            <Card>
+              <Text style={styles.summary}>{disease.summary}</Text>
+            </Card>
+          </View>
 
-      <View style={styles.section}>
-        <SectionHeader title="Common symptoms" subtitle="What to look for" />
-        <Card>
-          <BulletList items={disease.symptoms} />
-        </Card>
-      </View>
+          <View style={styles.section}>
+            <SectionHeader title="Common symptoms" subtitle="What to look for" />
+            <Card>
+              <BulletList items={disease.symptoms} />
+            </Card>
+          </View>
 
-      <View style={styles.section}>
-        <SectionHeader title="Recommended care" subtitle="Practical next steps" />
-        <Card>
-          <NumberedList items={disease.treatment} />
-        </Card>
-      </View>
+          <View style={styles.section}>
+            <SectionHeader title="Recommended care" subtitle="Practical next steps" />
+            <Card>
+              <NumberedList items={disease.treatment} />
+            </Card>
+          </View>
+        </>
+      ) : (
+        <View style={styles.section}>
+          <SectionHeader
+            title="Analysis pending"
+            subtitle="No result has been generated"
+          />
+          <Card variant="soft">
+            <Text style={styles.summary}>
+              Your leaf photo is saved privately to your account. Disease detection
+              is not connected yet, so no label, confidence score or care advice has
+              been produced. A real inference service will add the result here.
+            </Text>
+          </Card>
+        </View>
+      )}
 
       <Card variant="soft" style={styles.disclaimer}>
         <View style={styles.disclaimerRow}>
@@ -105,8 +145,9 @@ export default function ResultScreen() {
           <View style={styles.disclaimerCopy}>
             <Text style={styles.disclaimerTitle}>AI-assisted, not a diagnosis</Text>
             <Text style={styles.disclaimerBody}>
-              This screen demonstrates result presentation with sample data. Confirm
-              serious plant health issues with a local agronomist or extension service.
+              {isPreview
+                ? 'This screen demonstrates result presentation with sample data. Confirm serious plant health issues with a local agronomist or extension service.'
+                : 'This record is stored for your review only. Confirm serious plant health issues with a local agronomist or extension service.'}
             </Text>
           </View>
         </View>

@@ -8,23 +8,27 @@ import Card from '../../src/components/ui/Card';
 import Button from '../../src/components/ui/Button';
 import Input from '../../src/components/ui/Input';
 import LeafMark from '../../src/components/ui/LeafMark';
+import { useAuth } from '../../src/context/AuthContext';
+import { errorMessage } from '../../src/services/auth';
 import { colors, spacing, typography } from '../../src/theme';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { signIn, isConfigured } = useAuth();
   const [form, setForm] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   function update(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
-    setNotice('');
+    setNotice(null);
   }
 
-  function submit() {
+  async function submit() {
     const next = {};
     if (!form.email.trim()) next.email = 'Email is required.';
     else if (!EMAIL.test(form.email.trim())) next.email = 'Enter a valid email address.';
@@ -32,10 +36,25 @@ export default function LoginScreen() {
     else if (form.password.length < 6) next.password = 'Use at least 6 characters.';
 
     setErrors(next);
-    if (Object.keys(next).length === 0) {
-      setNotice(
-        'This preview does not connect to an auth service yet. Supabase login will be added in a later milestone.'
-      );
+    if (Object.keys(next).length > 0) return;
+
+    if (!isConfigured) {
+      setNotice({
+        tone: 'info',
+        text: 'Supabase is not configured. Add the public env values from .env.example to enable sign-in.',
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    setNotice(null);
+    try {
+      await signIn({ email: form.email, password: form.password });
+      router.replace('/home');
+    } catch (error) {
+      setNotice({ tone: 'error', text: errorMessage(error) });
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -79,16 +98,33 @@ export default function LoginScreen() {
           returnKeyType="done"
         />
 
-        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+        {notice ? (
+          <Text
+            style={[
+              styles.notice,
+              notice.tone === 'error' && styles.noticeError,
+            ]}
+          >
+            {notice.text}
+          </Text>
+        ) : null}
 
-        <Button label="Sign in" fullWidth onPress={submit} style={styles.submit} />
         <Button
-          label="Explore the UI preview"
-          variant="secondary"
+          label="Sign in"
           fullWidth
-          onPress={() => router.replace('/home')}
-          style={styles.preview}
+          onPress={submit}
+          loading={submitting}
+          style={styles.submit}
         />
+        {!isConfigured ? (
+          <Button
+            label="Explore the UI preview"
+            variant="secondary"
+            fullWidth
+            onPress={() => router.replace('/home')}
+            style={styles.preview}
+          />
+        ) : null}
       </Card>
 
       <View style={styles.footer}>
@@ -129,6 +165,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     lineHeight: 19,
   },
+  noticeError: { color: '#9A4032', backgroundColor: '#FDE5E0' },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
