@@ -1,8 +1,9 @@
 import { Platform } from 'react-native';
 import { File } from 'expo-file-system';
+import { uploadConfig } from '../config/upload';
 import { supabase } from '../lib/supabase';
 
-export const LEAF_BUCKET = 'leaf-images';
+export const LEAF_BUCKET = uploadConfig.bucket;
 
 function client() {
   if (!supabase) throw new Error('Supabase is not configured.');

@@ -49,7 +49,7 @@ Leaf images are uploaded to:
 leaf-images/<user-id>/<scan-id>.jpg
 ```
 
-The client keeps that path in `plant_scans.image_path`. Signed URLs are required to read images because the bucket is private.
+The client keeps that path in `plant_scans.image_path`. Signed URLs are required to read images because the bucket is private. The bucket accepts JPEG, PNG and WebP images up to 10 MB; the app enforces the same limits (see `src/config/upload.js`) before uploading.
 
 ## AI boundary
 

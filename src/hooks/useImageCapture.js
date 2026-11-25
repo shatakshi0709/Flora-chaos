@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
+import { formatMaxSize, uploadConfig } from '../config/upload';
 
 /**
  * Real camera/gallery access. Detection is intentionally not performed here:
@@ -32,7 +33,7 @@ export function useImageCapture() {
       const options = {
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: uploadConfig.quality,
         base64: false,
       };
 
@@ -42,7 +43,19 @@ export function useImageCapture() {
           : await ImagePicker.launchImageLibraryAsync(options);
 
       if (!result.canceled && result.assets?.[0]) {
-        setImage(result.assets[0]);
+        const asset = result.assets[0];
+
+        if (asset.mimeType && !uploadConfig.allowedTypes.includes(asset.mimeType)) {
+          setError(`Choose a JPEG, PNG or WebP image (max ${formatMaxSize()}).`);
+          return;
+        }
+
+        if (asset.fileSize && asset.fileSize > uploadConfig.maxBytes) {
+          setError(`That image is too large. Choose one under ${formatMaxSize()}.`);
+          return;
+        }
+
+        setImage(asset);
       }
     } catch {
       setError('The image picker could not be opened. Please try again.');
