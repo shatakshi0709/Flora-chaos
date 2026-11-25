@@ -14,8 +14,9 @@ import { useAuth } from '../../../src/context/AuthContext';
 import { useImageCapture } from '../../../src/hooks/useImageCapture';
 import { useUserScans } from '../../../src/hooks/useUserScans';
 import { createScan } from '../../../src/services/scans';
-import { uploadLeafImage } from '../../../src/services/storage';
+import { removeLeafImage, uploadLeafImage } from '../../../src/services/storage';
 import { createId } from '../../../src/lib/id';
+import { describeImageError } from '../../../src/lib/image';
 import { plantTips } from '../../../src/data/sample';
 import { colors, radius, spacing, typography } from '../../../src/theme';
 
@@ -33,20 +34,29 @@ export default function ScanScreen() {
 
     setSaving(true);
     setSaveError(null);
+    let uploadedPath = null;
+
     try {
       const id = createId();
-      const imagePath = await uploadLeafImage({
+      uploadedPath = await uploadLeafImage({
         userId: user.id,
         imageUri: image.uri,
         scanId: id,
         mimeType: image.mimeType,
         fileSize: image.fileSize,
       });
-      const scan = await createScan({ id, imagePath, status: 'pending' });
+      const scan = await createScan({ id, imagePath: uploadedPath, status: 'pending' });
       await refresh();
       router.push({ pathname: '/result/[id]', params: { id: scan.id } });
     } catch (cause) {
-      setSaveError(cause?.message || 'The photo could not be saved. Please try again.');
+      if (uploadedPath) {
+        try {
+          await removeLeafImage(uploadedPath);
+        } catch {
+          // Best-effort cleanup; the original error is what the user needs.
+        }
+      }
+      setSaveError(describeImageError(cause));
     } finally {
       setSaving(false);
     }

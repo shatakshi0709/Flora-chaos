@@ -53,6 +53,13 @@ export async function uploadLeafImage({
   return path;
 }
 
+/** Removes an uploaded object, e.g. when the scan record could not be saved. */
+export async function removeLeafImage(path) {
+  if (!path) return;
+  const { error } = await client().storage.from(LEAF_BUCKET).remove([path]);
+  if (error) throw error;
+}
+
 export async function getSignedImageUrl(path, expiresIn = 3600) {
   const { data, error } = await client()
     .storage.from(LEAF_BUCKET)

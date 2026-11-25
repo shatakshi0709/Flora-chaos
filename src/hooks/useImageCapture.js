@@ -21,11 +21,14 @@ export function useImageCapture() {
           ? await ImagePicker.requestCameraPermissionsAsync()
           : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-      if (!permission.granted) {
+      if (!permission.granted || permission.accessPrivileges === 'none') {
+        const blocked = permission.canAskAgain === false;
         setError(
-          source === 'camera'
-            ? 'Camera access is needed to take a leaf photo.'
-            : 'Photo library access is needed to choose a leaf image.'
+          blocked
+            ? `Access is blocked. Enable ${source === 'camera' ? 'Camera' : 'Photos'} in your device Settings to continue.`
+            : source === 'camera'
+              ? 'Camera access is needed to take a leaf photo.'
+              : 'Photo library access is needed to choose a leaf image.'
         );
         return;
       }
