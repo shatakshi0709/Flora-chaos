@@ -39,6 +39,8 @@ export default function ScanScreen() {
         userId: user.id,
         imageUri: image.uri,
         scanId: id,
+        mimeType: image.mimeType,
+        fileSize: image.fileSize,
       });
       const scan = await createScan({ id, imagePath, status: 'pending' });
       await refresh();
