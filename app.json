@@ -35,6 +35,14 @@
           "resizeMode": "contain",
           "imageWidth": 200
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use the camera to photograph a plant leaf.",
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to choose a plant leaf image.",
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {
